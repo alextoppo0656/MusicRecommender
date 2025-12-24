@@ -1,71 +1,92 @@
 package com.musicrec.util;
 
-import com.musicrec.entity.UserSession;
-import com.musicrec.repository.UserSessionRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
-import java.util.HexFormat;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Simple session manager to store user access tokens
+ * In production, consider using Redis or a proper session store
+ */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class SessionManager {
     
-    private final UserSessionRepository sessionRepository;
+    // Store access tokens by user ID
+    private final Map<String, String> userAccessTokens = new ConcurrentHashMap<>();
     
-    public String hashToken(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+    // Store refresh tokens by user ID
+    private final Map<String, String> userRefreshTokens = new ConcurrentHashMap<>();
+    
+    /**
+     * Store access token for a user
+     */
+    public void setAccessToken(String userId, String accessToken) {
+        userAccessTokens.put(userId, accessToken);
+        log.debug("Stored access token for user: {}", userId);
+    }
+    
+    /**
+     * Get access token for a user
+     */
+    public String getAccessToken(String userId) {
+        String token = userAccessTokens.get(userId);
+        if (token == null) {
+            log.warn("No access token found for user: {}", userId);
+            throw new IllegalStateException("No Spotify access token found. Please log in again.");
+        }
+        return token;
+    }
+    
+    /**
+     * Store refresh token for a user
+     */
+    public void setRefreshToken(String userId, String refreshToken) {
+        userRefreshTokens.put(userId, refreshToken);
+        log.debug("Stored refresh token for user: {}", userId);
+    }
+    
+    /**
+     * Get refresh token for a user
+     */
+    public String getRefreshToken(String userId) {
+        return userRefreshTokens.get(userId);
+    }
+    
+    /**
+     * Store both tokens at once
+     */
+    public void setTokens(String userId, String accessToken, String refreshToken) {
+        setAccessToken(userId, accessToken);
+        if (refreshToken != null) {
+            setRefreshToken(userId, refreshToken);
         }
     }
     
-    public boolean validateSession(String userId, String token) {
-        String tokenHash = hashToken(token);
-        
-        UserSession session = sessionRepository.findById(userId).orElse(null);
-        
-        if (session != null) {
-            if (!session.getTokenHash().equals(tokenHash)) {
-                log.warn("Token mismatch for user {}. Updating session.", userId);
-                session.setTokenHash(tokenHash);
-                session.setLastSeen(LocalDateTime.now());
-                sessionRepository.save(session);
-            } else {
-                session.setLastSeen(LocalDateTime.now());
-                sessionRepository.save(session);
-            }
-            return true;
-        }
-        
-        // Create new session
-        UserSession newSession = UserSession.builder()
-            .userId(userId)
-            .tokenHash(tokenHash)
-            .lastSeen(LocalDateTime.now())
-            .build();
-        
-        sessionRepository.save(newSession);
-        log.info("New session registered for user: {}", userId);
-        return true;
+    /**
+     * Check if user has a valid access token
+     */
+    public boolean hasAccessToken(String userId) {
+        return userAccessTokens.containsKey(userId);
     }
     
-    @Scheduled(fixedRate = 600000) // Every 10 minutes
-    public void cleanupOldSessions() {
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(2);
-        int deleted = sessionRepository.deleteOldSessions(cutoff);
-        if (deleted > 0) {
-            log.info("Cleaned up {} old sessions", deleted);
-        }
+    /**
+     * Clear all tokens for a user (on logout)
+     */
+    public void clearSession(String userId) {
+        userAccessTokens.remove(userId);
+        userRefreshTokens.remove(userId);
+        log.info("Cleared session for user: {}", userId);
+    }
+    
+    /**
+     * Clear all sessions (for testing/admin purposes)
+     */
+    public void clearAllSessions() {
+        userAccessTokens.clear();
+        userRefreshTokens.clear();
+        log.warn("Cleared all sessions");
     }
 }

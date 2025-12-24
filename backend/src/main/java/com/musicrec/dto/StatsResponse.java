@@ -7,10 +7,10 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StatsResponse {
-    private Long totalSongs;
-    private Long totalLiked;
-    private Long totalFeedback;
-    private Long feedbackLiked;
-    private Long feedbackSkipped;
-    private String status = "success";
+    private boolean success;
+    private long likedTracksCount;
+    private long recommendedTracksCount;
+    private long uniqueArtistsCount;
+    private long likedRecommendations;
+    private long dislikedRecommendations;
 }

@@ -94,13 +94,18 @@ public class SpotifyService {
         }
     }
     
+    /**
+     * Fetch ALL liked tracks from Spotify without fetching genres.
+     * This is much faster and doesn't hit rate limits.
+     * Genres can be fetched later in smaller batches if needed.
+     */
     public List<Map<String, Object>> getAllLikedTracks(String accessToken) {
         List<Map<String, Object>> allTracks = new ArrayList<>();
         int offset = 0;
         int limit = 50;
         boolean hasMore = true;
         
-        log.info("Fetching all liked tracks from Spotify...");
+        log.info("Fetching all liked tracks from Spotify (without genres)...");
         
         while (hasMore) {
             rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
@@ -124,7 +129,8 @@ public class SpotifyService {
                     for (Map<String, Object> item : items) {
                         Map<String, Object> track = (Map<String, Object>) item.get("track");
                         if (track != null) {
-                            allTracks.add(processTrack(track, accessToken));
+                            // FIXED: Don't fetch genres here - just process basic track info
+                            allTracks.add(processTrackBasic(track));
                         }
                     }
                     
@@ -133,6 +139,11 @@ public class SpotifyService {
                     offset += limit;
                     
                     log.info("Fetched {} tracks so far...", allTracks.size());
+                    
+                    // Add small delay between pagination calls to be nice to Spotify API
+                    if (hasMore) {
+                        Thread.sleep(100);
+                    }
                 } else {
                     hasMore = false;
                 }
@@ -143,33 +154,40 @@ public class SpotifyService {
                 }
                 log.error("Error fetching liked tracks at offset {}: {}", offset, e.getMessage());
                 hasMore = false;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Sleep interrupted during pagination");
+                hasMore = false;
             }
         }
         
-        log.info("Retrieved total of {} liked tracks", allTracks.size());
+        log.info("✅ Retrieved total of {} liked tracks (without genres)", allTracks.size());
         return allTracks;
     }
     
-    private Map<String, Object> processTrack(Map<String, Object> track, String accessToken) {
+    /**
+     * Process track without fetching additional data.
+     * This is MUCH faster and doesn't cause rate limit issues.
+     */
+    private Map<String, Object> processTrackBasic(Map<String, Object> track) {
         Map<String, Object> processed = new HashMap<>();
         
         String trackName = StringUtil.sanitize((String) track.get("name"));
         processed.put("trackName", trackName);
         processed.put("spotifyId", track.get("id"));
         
+        // Get artist info
         List<Map<String, Object>> artists = (List<Map<String, Object>>) track.get("artists");
         if (artists != null && !artists.isEmpty()) {
             String artistName = StringUtil.sanitize((String) artists.get(0).get("name"));
             processed.put("artist", artistName);
             
-            // Fetch artist genres (with rate limiting)
+            // Store artist ID for later genre fetching if needed
             String artistId = (String) artists.get(0).get("id");
-            if (artistId != null) {
-                List<String> genres = getArtistGenres(artistId, accessToken);
-                processed.put("tags", String.join(", ", genres));
-            }
+            processed.put("artistId", artistId);
         }
         
+        // Get album info
         Map<String, Object> album = (Map<String, Object>) track.get("album");
         if (album != null) {
             processed.put("album", StringUtil.sanitize((String) album.get("name")));
@@ -185,32 +203,78 @@ public class SpotifyService {
             }
         }
         
+        // Don't fetch genres here - empty tags for now
+        processed.put("tags", "");
+        
         return processed;
     }
     
-    private List<String> getArtistGenres(String artistId, String accessToken) {
-        try {
-            rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
+    /**
+     * Fetch genres for a batch of artist IDs.
+     * Call this ONLY when generating recommendations, not during initial load.
+     * Process in batches to avoid rate limits.
+     */
+    public Map<String, List<String>> getGenresForArtists(List<String> artistIds, String accessToken) {
+        Map<String, List<String>> artistGenres = new HashMap<>();
+        
+        log.info("Fetching genres for {} artists in batches...", artistIds.size());
+        
+        // Process up to 50 artists at a time using Spotify's batch endpoint
+        List<String> batch = new ArrayList<>();
+        
+        for (int i = 0; i < artistIds.size(); i++) {
+            batch.add(artistIds.get(i));
             
-            Map<String, Object> artist = webClientBuilder.build()
-                .get()
-                .uri(spotifyApiBaseUrl + "/artists/" + artistId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
-            
-            if (artist != null && artist.containsKey("genres")) {
-                List<String> genres = (List<String>) artist.get("genres");
-                return genres.stream()
-                    .map(String::toLowerCase)
-                    .limit(3)
-                    .toList();
+            // When batch is full or we're at the end, make API call
+            if (batch.size() == 50 || i == artistIds.size() - 1) {
+                try {
+                    rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
+                    
+                    String ids = String.join(",", batch);
+                    Map<String, Object> response = webClientBuilder.build()
+                        .get()
+                        .uri(spotifyApiBaseUrl + "/artists?ids=" + ids)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .retrieve()
+                        .bodyToMono(Map.class)
+                        .block();
+                    
+                    if (response != null && response.containsKey("artists")) {
+                        List<Map<String, Object>> artists = (List<Map<String, Object>>) response.get("artists");
+                        for (Map<String, Object> artist : artists) {
+                            if (artist != null) {
+                                String artistId = (String) artist.get("id");
+                                List<String> genres = (List<String>) artist.getOrDefault("genres", Collections.emptyList());
+                                artistGenres.put(artistId, genres.stream()
+                                    .map(String::toLowerCase)
+                                    .limit(3)
+                                    .toList());
+                            }
+                        }
+                    }
+                    
+                    batch.clear();
+                    
+                    // Small delay between batches
+                    Thread.sleep(100);
+                    
+                } catch (Exception e) {
+                    log.warn("Error fetching genres for batch: {}", e.getMessage());
+                    batch.clear();
+                }
             }
-        } catch (Exception e) {
-            log.debug("Could not fetch artist genres: {}", e.getMessage());
         }
-        return Collections.emptyList();
+        
+        log.info("✅ Fetched genres for {} artists", artistGenres.size());
+        return artistGenres;
+    }
+    
+    /**
+     * OLD METHOD - kept for backward compatibility but doesn't fetch genres anymore
+     */
+    @Deprecated
+    private Map<String, Object> processTrack(Map<String, Object> track, String accessToken) {
+        return processTrackBasic(track);
     }
     
     private String buildFormData(Map<String, String> data) {

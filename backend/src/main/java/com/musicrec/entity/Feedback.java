@@ -1,22 +1,20 @@
 package com.musicrec.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "feedback",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"userId", "trackName", "artist"}),
-    indexes = {
-        @Index(name = "idx_user_feedback", columnList = "userId"),
-        @Index(name = "idx_liked", columnList = "liked")
-    }
-)
-@Getter
-@Setter
+@Table(name = "feedback", indexes = {
+    @Index(name = "idx_user_track", columnList = "userId,trackId", unique = true),
+    @Index(name = "idx_user_type", columnList = "userId,feedbackType")
+})
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Feedback {
     
     @Id
@@ -26,30 +24,25 @@ public class Feedback {
     @Column(nullable = false)
     private String userId;
     
-    @Column(nullable = false, length = 500)
-    private String trackName;
-    
-    @Column(nullable = false, length = 300)
-    private String artist;
+    @Column(nullable = false)
+    private Long trackId;
     
     @Column(nullable = false)
-    private Boolean liked;
-    
-    @Column(length = 500)
-    private String album;
-    
-    @Column(name = "release_year", length = 4)
-    private String releaseYear;
-    
-    @Column(length = 100)
-    private String spotifyId;
+    private String feedbackType; // "like" or "dislike"
     
     @Column(nullable = false)
-    private LocalDateTime timestamp = LocalDateTime.now();
+    private LocalDateTime createdAt;
+    
+    private LocalDateTime updatedAt;
     
     @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+    
     @PreUpdate
     protected void onUpdate() {
-        timestamp = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 }

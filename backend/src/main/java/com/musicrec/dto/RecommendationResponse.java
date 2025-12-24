@@ -8,8 +8,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RecommendationResponse {
+    private boolean success;
+    private List<TrackDto> likedTracks;
     private List<TrackDto> recommendations;
-    private String mode;
-    private Integer totalAvailable;
-    private String status = "success";
+    private int currentBatch;
+    private int totalBatches;
+    private boolean hasMore;
+    private boolean hasPrevious;
+    private String message;
 }
