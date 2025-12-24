@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_liked", columnList = "liked")
     }
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -37,7 +38,7 @@ public class Feedback {
     @Column(length = 500)
     private String album;
     
-    @Column(length = 4)
+    @Column(name = "release_year", length = 4)
     private String releaseYear;
     
     @Column(length = 100)

@@ -32,13 +32,17 @@ public class LastFmService {
     private final RateLimiter rateLimiter;
     
     private static final String RATE_LIMIT_KEY = "lastfm_api";
-    private static final int MAX_REQUESTS = 5;
+    private static final int MAX_REQUESTS = 2; // REDUCED from 5 to 2
     private static final long WINDOW_SECONDS = 1;
+    private static final long DELAY_BETWEEN_CALLS_MS = 500; // 500ms delay
     
     public List<String> getSimilarArtists(String artistName) {
         if (StringUtil.normalize(artistName).isEmpty()) {
             return Collections.emptyList();
         }
+        
+        // Add delay before API call
+        addDelay();
         
         rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
         
@@ -52,7 +56,8 @@ public class LastFmService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(800)))
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2)))
+                .timeout(Duration.ofSeconds(10))
                 .block();
             
             if (response != null && response.has("similarartists")) {
@@ -68,7 +73,14 @@ public class LastFmService {
                 return result;
             }
         } catch (WebClientResponseException e) {
-            log.warn("Last.fm getSimilarArtists failed for {}: {}", artistName, e.getMessage());
+            if (e.getStatusCode().value() == 429) {
+                log.warn("Last.fm rate limit hit for getSimilarArtists: {}", artistName);
+                addLongDelay(); // Wait longer on rate limit
+            } else {
+                log.warn("Last.fm getSimilarArtists failed for {}: {}", artistName, e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("Last.fm getSimilarArtists error for {}: {}", artistName, e.getMessage());
         }
         
         return Collections.emptyList();
@@ -78,6 +90,9 @@ public class LastFmService {
         if (StringUtil.normalize(artistName).isEmpty()) {
             return Collections.emptyList();
         }
+        
+        // Add delay before API call
+        addDelay();
         
         rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
         
@@ -91,7 +106,8 @@ public class LastFmService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(800)))
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2)))
+                .timeout(Duration.ofSeconds(10))
                 .block();
             
             if (response != null && response.has("toptracks")) {
@@ -114,7 +130,14 @@ public class LastFmService {
                 return result;
             }
         } catch (WebClientResponseException e) {
-            log.warn("Last.fm getTopTracks failed for {}: {}", artistName, e.getMessage());
+            if (e.getStatusCode().value() == 429) {
+                log.warn("Last.fm rate limit hit for getTopTracks: {}", artistName);
+                addLongDelay();
+            } else {
+                log.warn("Last.fm getTopTracks failed for {}: {}", artistName, e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("Last.fm getTopTracks error for {}: {}", artistName, e.getMessage());
         }
         
         return Collections.emptyList();
@@ -124,6 +147,9 @@ public class LastFmService {
         if (StringUtil.normalize(artistName).isEmpty()) {
             return Collections.emptyList();
         }
+        
+        // Add delay before API call
+        addDelay();
         
         rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
         
@@ -137,7 +163,8 @@ public class LastFmService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(800)))
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2)))
+                .timeout(Duration.ofSeconds(10))
                 .block();
             
             if (response != null && response.has("toptags")) {
@@ -156,7 +183,14 @@ public class LastFmService {
                 return result;
             }
         } catch (WebClientResponseException e) {
-            log.warn("Last.fm getArtistTags failed for {}: {}", artistName, e.getMessage());
+            if (e.getStatusCode().value() == 429) {
+                log.warn("Last.fm rate limit hit for getArtistTags: {}", artistName);
+                addLongDelay();
+            } else {
+                log.warn("Last.fm getArtistTags failed for {}: {}", artistName, e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("Last.fm getArtistTags error for {}: {}", artistName, e.getMessage());
         }
         
         return Collections.emptyList();
@@ -166,6 +200,9 @@ public class LastFmService {
         if (StringUtil.normalize(tag).isEmpty()) {
             return Collections.emptyList();
         }
+        
+        // Add delay before API call
+        addDelay();
         
         rateLimiter.checkRateLimit(RATE_LIMIT_KEY, MAX_REQUESTS, WINDOW_SECONDS);
         
@@ -179,7 +216,8 @@ public class LastFmService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(800)))
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2)))
+                .timeout(Duration.ofSeconds(10))
                 .block();
             
             if (response != null && response.has("tracks")) {
@@ -207,9 +245,40 @@ public class LastFmService {
                 return result;
             }
         } catch (WebClientResponseException e) {
-            log.warn("Last.fm getTopTracksForTag failed for {}: {}", tag, e.getMessage());
+            if (e.getStatusCode().value() == 429) {
+                log.warn("Last.fm rate limit hit for getTopTracksForTag: {}", tag);
+                addLongDelay();
+            } else {
+                log.warn("Last.fm getTopTracksForTag failed for {}: {}", tag, e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("Last.fm getTopTracksForTag error for {}: {}", tag, e.getMessage());
         }
         
         return Collections.emptyList();
+    }
+    
+    /**
+     * Add delay between API calls to respect rate limits
+     */
+    private void addDelay() {
+        try {
+            Thread.sleep(DELAY_BETWEEN_CALLS_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Delay interrupted");
+        }
+    }
+    
+    /**
+     * Add longer delay when rate limit is hit
+     */
+    private void addLongDelay() {
+        try {
+            Thread.sleep(3000); // 3 seconds
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Long delay interrupted");
+        }
     }
 }

@@ -1,6 +1,3 @@
-// ============ FeedbackRequest.java ============
-// Location: backend/src/main/java/com/musicrec/dto/FeedbackRequest.java
-
 package com.musicrec.dto;
 
 import jakarta.validation.constraints.*;
@@ -28,4 +25,29 @@ public class FeedbackRequest {
     
     @Size(max = 100, message = "Spotify ID too long")
     private String spotifyId;
+    
+    public String getValidatedYear() {
+        if (year == null || year.trim().isEmpty()) {
+            return null;
+        }
+        
+        String trimmed = year.trim();
+        
+        if (!trimmed.matches("^\\d{4}$")) {
+            return null;
+        }
+        
+        try {
+            int yearInt = Integer.parseInt(trimmed);
+            int currentYear = java.time.Year.now().getValue();
+            
+            if (yearInt >= 1900 && yearInt <= currentYear + 1) {
+                return trimmed;
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        
+        return null;
+    }
 }

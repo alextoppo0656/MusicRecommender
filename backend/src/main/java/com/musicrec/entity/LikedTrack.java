@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
     uniqueConstraints = @UniqueConstraint(columnNames = {"userId", "trackName", "artist"}),
     indexes = @Index(name = "idx_user_liked", columnList = "userId")
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -31,7 +32,7 @@ public class LikedTrack {
     @Column(length = 500)
     private String album;
     
-    @Column(length = 4)
+    @Column(name = "release_year", length = 4)
     private String releaseYear;
     
     @Column(length = 100)

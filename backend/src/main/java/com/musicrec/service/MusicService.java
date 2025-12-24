@@ -62,7 +62,7 @@ public class MusicService {
                 fbTrack.put("spotifyId", fb.getSpotifyId());
                 saveLikedTrack(userId, fbTrack);
             } catch (Exception e) {
-                log.warn("Failed to save feedback track: {}", e.getMessage());
+                log.warn("Failed to save feedback song into liked: {}", e.getMessage());
             }
         }
         
@@ -112,7 +112,7 @@ public class MusicService {
         
         for (String seedArtist : seedArtists) {
             if (newTracks.size() >= maxExpandPerCall * 2) {
-                break; // Collected enough candidates
+                break;
             }
             
             // Artist similarity expansion
@@ -232,12 +232,14 @@ public class MusicService {
     
     @Transactional
     public ApiResponse saveFeedback(String userId, FeedbackRequest request) {
+        String validatedYear = request.getValidatedYear();
+        
         Feedback feedback = feedbackRepository
             .findByUserIdAndTrackNameAndArtist(userId, request.getTrackName(), request.getArtist())
             .map(existing -> {
                 existing.setLiked(request.getLiked());
                 existing.setAlbum(request.getAlbum());
-                existing.setReleaseYear(request.getYear());
+                existing.setReleaseYear(validatedYear);
                 existing.setSpotifyId(request.getSpotifyId());
                 return existing;
             })
@@ -247,7 +249,7 @@ public class MusicService {
                 .artist(request.getArtist())
                 .liked(request.getLiked())
                 .album(request.getAlbum())
-                .releaseYear(request.getYear())
+                .releaseYear(validatedYear)
                 .spotifyId(request.getSpotifyId())
                 .build());
         
@@ -259,7 +261,7 @@ public class MusicService {
             track.put("trackName", request.getTrackName());
             track.put("artist", request.getArtist());
             track.put("album", request.getAlbum());
-            track.put("year", request.getYear());
+            track.put("year", validatedYear);
             track.put("spotifyId", request.getSpotifyId());
             saveLikedTrack(userId, track);
             
@@ -272,7 +274,7 @@ public class MusicService {
                     .trackName(request.getTrackName())
                     .artist(request.getArtist())
                     .album(request.getAlbum())
-                    .releaseYear(request.getYear())
+                    .releaseYear(validatedYear)
                     .source("user_liked")
                     .spotifyId(request.getSpotifyId())
                     .build();

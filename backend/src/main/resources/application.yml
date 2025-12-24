@@ -1,21 +1,22 @@
+server:
+  port: 8080
+  address: 127.0.0.1
+
 spring:
   application:
-    name: music-recommender
+    name: music-recommender-backend
   
   datasource:
-    url: jdbc:h2:file:./data/musicdb;AUTO_SERVER=TRUE
+    url: jdbc:h2:file:./data/musicdb
     driver-class-name: org.h2.Driver
     username: sa
     password: 
   
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     show-sql: false
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.H2Dialect
   
   h2:
     console:
@@ -27,50 +28,38 @@ spring:
       client:
         registration:
           spotify:
-            client-id: 4f3dcec799924e0aaed01e76671e72d0
-            client-secret: 7cbe3d7e6ebb471cb5e1c7d0d384e025
-            redirect-uri: http://127.0.0.1:3000/callback
+            client-id: ${SPOTIFY_CLIENT_ID}
+            client-secret: ${SPOTIFY_CLIENT_SECRET}
+            redirect-uri: ${SPOTIFY_REDIRECT_URI:http://127.0.0.1:3000/callback}
             scope: user-library-read
-            authorization-grant-type: authorization_code
-
-server:
-  port: 8080
-  error:
-    include-message: always
-    include-binding-errors: always
+        provider:
+          spotify:
+            authorization-uri: https://accounts.spotify.com/authorize
+            token-uri: https://accounts.spotify.com/api/token
+            user-info-uri: https://api.spotify.com/v1/me
 
 app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 86400000
   spotify:
     api-base-url: https://api.spotify.com/v1
     auth-base-url: https://accounts.spotify.com
-  
   lastfm:
-    api-key: 461e368f243793631bd9ee716e7d1568
-    api-secret: 3118b41e9b8dfbb09ef45e0dae782a96
-    api-base-url: http://ws.audioscrobbler.com/2.0
-  
-  jwt:
-    secret: 3291287ab14b9f49a3f865389faf3059e20640a07b50657e87cd2c8ff679139b
-    expiration: 86400000
-  
+    api-key: ${LASTFM_API_KEY}
+    api-secret: ${LASTFM_API_SECRET:}
+    api-base-url: http://ws.audioscrobbler.com/2.0/
   recommendation:
     max-expand-per-call: 30
     ml-threshold-liked-songs: 50
-    cache-ttl-seconds: 3600
-    cache-max-size: 1000
-  
+  cache:
+    ttl: 3600
+    max-size: 1000
   rate-limit:
-    lastfm:
-      calls: 5
-      period-seconds: 1
-    spotify:
-      calls: 10
-      period-seconds: 1
+    spotify-calls-per-second: 5
+    lastfm-calls-per-second: 2
 
 logging:
   level:
     com.musicrec: INFO
     org.springframework.web: INFO
-    org.hibernate: WARN
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

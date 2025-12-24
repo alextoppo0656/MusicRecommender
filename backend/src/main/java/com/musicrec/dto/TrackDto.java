@@ -20,5 +20,5 @@ public class TrackDto {
     private String genreSeed;
     private String spotifyId;
     private String albumImage;
-    private Double likeProb; // For ML mode
+    private Double likeProb;
 }

@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_source", columnList = "source")
     }
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -34,11 +35,11 @@ public class ExpandedTrack {
     @Column(length = 500)
     private String album;
     
-    @Column(length = 4)
+    @Column(name = "release_year", length = 4)
     private String releaseYear;
     
     @Column(nullable = false)
-    private String source; // spotify_liked, artist_similarity, genre_similarity, user_liked
+    private String source;
     
     @Column(length = 500)
     private String tags;

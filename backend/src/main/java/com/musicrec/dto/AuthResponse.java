@@ -1,6 +1,3 @@
-// ============ AuthResponse.java ============
-// Location: backend/src/main/java/com/musicrec/dto/AuthResponse.java
-
 package com.musicrec.dto;
 
 import lombok.*;
@@ -17,6 +14,8 @@ public class AuthResponse {
     
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class UserInfo {
         private String userId;
         private String displayName;

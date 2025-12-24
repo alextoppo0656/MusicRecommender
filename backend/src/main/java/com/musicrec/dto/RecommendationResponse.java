@@ -9,7 +9,7 @@ import java.util.List;
 @AllArgsConstructor
 public class RecommendationResponse {
     private List<TrackDto> recommendations;
-    private String mode; // "ML" or "Random"
+    private String mode;
     private Integer totalAvailable;
     private String status = "success";
 }

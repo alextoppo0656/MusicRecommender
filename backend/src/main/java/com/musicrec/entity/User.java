@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
 @Table(name = "users", indexes = {
     @Index(name = "idx_spotify_id", columnList = "spotifyId", unique = true)
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

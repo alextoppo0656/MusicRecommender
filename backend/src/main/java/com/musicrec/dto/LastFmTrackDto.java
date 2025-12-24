@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class LastFmTrackDto {
     private String name;
-    private Object artist; // Can be String or Object
+    private Object artist;
     
     public String getArtistName() {
         if (artist instanceof String) {
